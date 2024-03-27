@@ -1,0 +1,44 @@
+stages:
+  - build
+  - qa
+  - production
+
+default:
+  image: node:latest
+  cache: &global_cache
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+    policy: pull
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@latest-8 --activate
+    - pnpm config set store-dir .pnpm-store
+
+build:
+  stage: build
+  cache:
+    <<: *global_cache
+    policy: pull-push
+  script:
+    - pnpm install
+    - pnpm build
+  artifacts:
+    paths:
+      - dist/
+
+deploy-qa:
+  stage: qa
+  environment:
+    name: QA
+  script:
+    - pnpm dlx @azure/static-web-apps-cli deploy ./dist --app-name stapp-vue2048-qa --env=production
+
+deploy-production:
+  stage: production
+  environment:
+    name: Prod
+  script:
+    - pnpm dlx @azure/static-web-apps-cli deploy ./dist --app-name stapp-vue2048-prod --env=production
