@@ -1,0 +1,61 @@
+name: CI/CD pipeline
+
+on:
+  pull_request:
+    types: [opened, edited]
+  push:
+    branches:
+      - lab09
+      - main
+  workflow_dispatch:
+    
+env:
+  BUILD_ARTIFACT_NAME: "package"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      
+      - name: Build package
+        run: | 
+          pnpm install
+          pnpm build
+        
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{env.BUILD_ARTIFACT_NAME}}
+          path: dist/
+      
+      - name: Perform static analysis
+        if: github.event_name == 'pull_request'
+        run: |
+          pnpm type-check
+          pnpm lint
+      
+      - name: Execute unit tests
+        if: github.event_name == 'pull_request'
+        run: pnpm test
+
+  deploy-qa:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    environment: QA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch'
+    needs: deploy-qa
+    environment: PROD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
